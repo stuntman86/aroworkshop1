@@ -49,6 +49,8 @@ In this lab, we’re going to deploy the web component of the ParksMap applicati
 
 Exercise: Deploying your First Image
 
+First lets create a project. Please name it parksmap and append the user number you have been assigned. For example student1 should have a project parksmap1.
+
 Let’s start by doing the simplest thing possible - get a plain old Docker-formatted image to run on Azure Red Hat OpenShift. This is incredibly simple to do. With OpenShift it can be done directly from the web console.
 
 If you’re no longer on the Topology view in the Developer perspective, return there now. Click Container Image to open a dialog that will allow you to specify the information for the image you want to deploy.
