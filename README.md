@@ -548,5 +548,335 @@ Get the route so that we can access the application via:
 
 You should get something like this: 
 
-> NAME           HOST/PORT                                                      PATH      SERVICES              PORT      TERMINATION   WILDCARD
-ostoy-route   ostoy-route-ostoy.apps.abcd1234.westus2.aroapp.io             ostoy-frontend-svc   <all>                   None
+![image](https://user-images.githubusercontent.com/32516987/216837655-07da2dbd-d15a-484b-a557-1a6a48568d43.png)
+
+Copy the generated route and copy paste it on your browser. You will see the homepage of the app.
+
+![image](https://user-images.githubusercontent.com/32516987/216837671-2d43f3ac-1239-40e9-9187-669a244fee78.png)
+
+
+### Logging and Metrics
+
+Assuming you can access the application via the Route provided and are still logged into the CLI (please go back to part 2 if you need to do any of those) we’ll start to use this application. As stated earlier, this application will allow you to “push the buttons” of OpenShift and see how it works. We will do this to test the logs.
+
+Click on the Home menu item and then click in the message box for “Log Message (stdout)” and write any message you want to output to the stdout stream. You can try “All is well!”. Then click “Send Message”.
+
+![image](https://user-images.githubusercontent.com/32516987/216837696-c72d53d6-75a8-452d-aa6f-fb9d813f939d.png)
+
+Click in the message box for “Log Message (stderr)” and write any message you want to output to the stderr stream. You can try “Oh no! Error!”. Then click “Send Message”.
+
+![image](https://user-images.githubusercontent.com/32516987/216837701-9d0c8541-14c9-465d-847b-b4f814b4bc34.png)
+
+
+### View Logs directly from the pod 
+
+Go to the CLI and enter the following command to retrieve the name of your frontend pod which we will use to view the pod logs:
+
+> oc get pods -o name
+pod/ostoy-frontend-679cb85695-5cn7x
+pod/ostoy-microservice-86b4c6f559-p594d
+
+So the pod name in this case is ostoy-frontend-679cb85695-5cn7x. Then run oc logs ostoy-frontend-679cb85695-5cn7x and you should see your messages:
+
+> oc logs ostoy-frontend-679cb85695-5cn7x
+[...]
+ostoy-frontend-679cb85695-5cn7x: server starting on port 8080
+Redirecting to /home
+stdout: All is well!
+stderr: Oh no! Error!
+
+You should see both the stdout and stderr messages.
+
+Try to see them from within the OpenShift Web Console as well. Make sure you are in the “ostoy” project. In the left menu click Workloads > Pods > <frontend-pod-name>. Then click the “Logs” sub-tab.
+ 
+ 
+![image](https://user-images.githubusercontent.com/32516987/216837749-38a5929b-32f9-4fca-a2fd-d6a1410a0d9b.png)
+
+### Exploring Health Checks
+ 
+ In this section we will intentionally crash our pods and also make a pod non-responsive to the liveness probes and see how Kubernetes behaves. We will first intentionally crash our pod and see that Kubernetes will self-heal by immediately spinning it back up. Then we will trigger the health check by stopping the response on the /health endpoint in our app. After three consecutive failures, Kubernetes should kill the pod and then recreate it.
+
+ 
+ It would be best to prepare by splitting your screen between the OpenShift Web Console and the OSToy application so that you can see the results of our actions immediately.
+
+![image](https://user-images.githubusercontent.com/32516987/216837795-f7cd0576-c6cd-4a71-8014-350095047080.png)
+
+ 
+ But if your screen is too small or that just won’t work, then open the OSToy application in another tab so you can quickly switch to the OpenShift Web Console once you click the button. To get to this deployment in the OpenShift Web Console go to the left menu and click:
+
+Workloads > Deployments > “ostoy-frontend”
+
+Go to the browser tab that has your OSToy app, click on Home in the left menu, and enter a message in the “Crash Pod” tile (e.g., “This is goodbye!”) and press the “Crash Pod” button. This will cause the pod to crash and Kubernetes should restart the pod. After you press the button you will see:
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216837818-b58beb34-e57d-4a17-a676-f9af1e40f042.png)
+
+ 
+ Quickly switch to the tab with the deployment showing in the web console. You will see that the pod turns yellowish, meaning it is down but should quickly come back up and show blue. It does happen quickly so you might miss it.
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216837828-4da977e1-cd37-411b-ab85-749df4952907.png)
+
+ 
+ You can also check in the pod events and further verify that the container has crashed and been restarted.
+
+Click on Pods > [Pod Name] > Events
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216837870-e6a5b9f5-eb4d-4170-950c-6925ee9ad562.png)
+ 
+ 
+ Keep the page from the pod events still open from the previous step. Then in the OSToy app click on the “Toggle Health” button, in the “Toggle health status” tile. You will see the “Current Health” switch to “I’m not feeling all that well”.
+
+![image](https://user-images.githubusercontent.com/32516987/216837879-511bc64f-8f40-4221-90eb-00db430f8f15.png)
+
+This will cause the app to stop responding with a “200 HTTP code”. After 3 such consecutive failures (“A”), Kubernetes will kill the pod (“B”) and restart it (“C”). Quickly switch back to the pod events tab and you will see that the liveness probe failed and the pod as being restarted.
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216837885-4050aa20-ff15-412f-87a7-80092fd7234d.png)
+ 
+ ### Persistent Storage
+
+ In this section we will execute a simple example of using persistent storage by creating a file that will be stored on a persistent volume in our cluster and then confirm that it will “persist” across pod failures and recreation.
+
+nside the OpenShift web console click on Storage > Persistent Volume Claims in the left menu. You will then see a list of all persistent volume claims that our application has made. In this case there is just one called “ostoy-pvc”. If you click on it you will also see other pertinent information such as whether it is bound or not, size, access mode and creation time.
+
+In this case the mode is RWO (Read-Write-Once) which means that the volume can only be mounted to one node, but the pod(s) can both read and write to that volume. The default in ARO is for Persistent Volumes to be backed by Azure Disk, but it is possible to use Azure Files so that you can use the RWX (Read-Write-Many) access mode. See here for more info on access modes.
+
+In the OSToy app click on Persistent Storage in the left menu. In the “Filename” area enter a filename for the file you will create (e.g., “test-pv.txt”). Use the “.txt” extension so you can easily open it in the browser.
+
+Underneath that, in the “File contents” box, enter text to be stored in the file. (e.g., “Azure Red Hat OpenShift is the greatest thing since sliced bread!”). Then click “Create file”.
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216837922-f5a3179a-5cbc-43d8-b167-42aeddb48a0f.png)
+ 
+ You will then see the file you created appear above under “Existing files”. Click on the file and you will see the filename and the contents you entered.
+
+![image](https://user-images.githubusercontent.com/32516987/216837929-a2ae806d-da70-4f26-9699-217a46b31256.png)
+ 
+ We now want to kill the pod and ensure that the new pod that spins up will be able to see the file we created. Exactly like we did in the previous section. Click on Home in the left menu.
+
+Click on the “Crash pod” button. (You can enter a message if you’d like).
+
+Click on Persistent Storage in the left menu.
+
+You will see the file you created is still there and you can open it to view its contents to confirm.
+
+ ![image](https://user-images.githubusercontent.com/32516987/216837937-71637294-d4fa-41aa-b232-9635c0835916.png)
+
+Now let’s confirm that it’s actually there by using the CLI and checking if it is available to the container. If you remember we mounted the directory /var/demo_files to our PVC. So get the name of your frontend pod:
+ 
+> oc get pods
+ 
+ then get an SSH session into the container 
+ 
+ > oc rsh <pod name>
+ 
+ then > cd /var/demo_files
+ 
+ if you enter **ls** you can see all the files you created. Next, let’s open the file we created and see the contents
+ 
+ 
+> cat test-pv.txt
+ 
+ You should see the text you entered in the UI.
+
+ ![image](https://user-images.githubusercontent.com/32516987/216838064-24ac8507-239b-4b1c-9d3b-1253579ec55d.png)
+
+
+Then exit the SSH session by typing exit. You will then be in your CLI.
+ 
+ 
+ ## Configuration
+ 
+ In this section we’ll take a look at how OSToy can be configured using ConfigMaps, Secrets, and Environment Variables. This section won’t go into details explaining each , but will show you how they are exposed to the application.
+ 
+ 
+
+### Configuration using ConfigMaps
+
+ Click on Config Maps in the left menu.
+
+This will display the contents of the configmap available to the OSToy application. We defined this in the ostoy-fe-deployment.yaml here:
+
+> kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: ostoy-configmap-files
+data:
+  config.json:  '{ "default": "123" }'
+ 
+ ### Configuration with Secrets
+ 
+ Kubernetes Secret objects allow you to store and manage sensitive information, such as passwords, OAuth tokens, and ssh keys. Putting this information in a secret is safer and more flexible than putting it, verbatim, into a pod definition or a container image.
+
+Click on Secrets in the left menu.
+
+This will display the contents of the secrets available to the OSToy application. We defined this in the ostoy-fe-deployment.yaml here:
+ 
+ > apiVersion: v1
+kind: Secret
+metadata:
+  name: ostoy-secret
+data:
+  secret.txt: VVNFUk5BTUU9bXlfdXNlcgpQQVNTV09SRD1AT3RCbCVYQXAhIzYzMlk1RndDQE1UUWsKU01UUD1sb2NhbGhvc3QKU01UUF9QT1JUPTI1
+type: Opaque
+ 
+ ### Configuration using env variables
+ 
+Using environment variables is an easy way to change application behavior without requiring code changes. It allows different deployments of the same application to potentially behave differently based on the environment variables, and OpenShift makes it simple to set, view, and update environment variables for Pods/Deployments.
+ 
+ Click on ENV Variables in the left menu.
+
+This will display the environment variables available to the OSToy application. We added three as defined in the deployment spec of ostoy-fe-deployment.yaml here:
+ 
+ >  env:
+  - name: ENV_TOY_CONFIGMAP
+    valueFrom:
+      configMapKeyRef:
+        name: ostoy-configmap-env
+        key: ENV_TOY_CONFIGMAP
+  - name: ENV_TOY_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: ostoy-secret-env
+        key: ENV_TOY_SECRET
+  - name: MICROSERVICE_NAME
+    value: OSTOY_MICROSERVICE_SVC
+ 
+ 
+ The last one, **MICROSERVICE_NAME** is used for the intra-cluster communications between pods for this application. The application looks for this environment variable to know how to access the microservice in order to get the colors.
+ 
+
+## Networking and Scaling
+ In this section we’ll see how OSToy uses intra-cluster networking to separate functions by using microservices and visualize the scaling of pods.
+
+Let’s review how this application is set up…
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216838994-cd3ad84b-1025-4a64-8111-4b260c91426f.png)
+
+ 
+ As can be seen in the image above we have defined at least 2 separate pods, each with its own service. One is the frontend web application (with a service and a publicly accessible route) and the other is the backend microservice with a service object created so that the frontend pod can communicate with the microservice (across the pods if more than one). Therefore this microservice is not accessible from outside this cluster (or from other namespaces/projects, if configured, due to OpenShifts’ network policy, ovs-networkpolicy). The sole purpose of this microservice is to serve internal web requests and return a JSON object containing the current hostname and a randomly generated color string. This color string is used to display a box with that color displayed in the tile titled “Intra-cluster Communication”.
+ 
+ ### Networking
+ 
+ Click on Networking in the left menu. Review the networking configuration.
+
+The right tile titled “Hostname Lookup” illustrates how the service name created for a pod can be used to translate into an internal ClusterIP address. Enter the name of the microservice following the format of my-svc.my-namespace.svc.cluster.local which we created in our ostoy-microservice.yaml as seen here:
+ 
+ > apiVersion: v1
+kind: Service
+metadata:
+  name: ostoy-microservice-svc
+  labels:
+    app: ostoy-microservice
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: ostoy-microservice
+ 
+ In this case we will enter: 
+ 
+ > ostoy-microservice-svc.ostoy.svc.cluster.local
+ 
+ We will see an IP address returned. In our example it is 172.30.165.246. This is the intra-cluster IP address; only accessible from within the cluster.
+
+![image](https://user-images.githubusercontent.com/32516987/216839034-cd738f14-5ff1-4079-abd9-2aabf089c2cd.png)
+
+ 
+ ## Scaling
+ 
+ OpenShift allows one to scale up/down the number of pods for each part of an application as needed. This can be accomplished via changing our replicaset/deployment definition (declarative), by the command line (imperative), or via the web console (imperative). In our deployment definition (part of our ostoy-fe-deployment.yaml) we stated that we only want one pod for our microservice to start with. This means that the Kubernetes Replication Controller will always strive to keep one pod alive. We can also define pod autoscaling using the Horizontal Pod Autoscaler (HPA) based on load to expand past what we defined. We will do this in a later section of this lab.
+
+If we look at the tile on the left we should see one box randomly changing colors. This box displays the randomly generated color sent to the frontend by our microservice along with the pod name that sent it. Since we see only one box that means there is only one microservice pod. We will now scale up our microservice pods and will see the number of boxes change.
+
+To confirm that we only have one pod running for our microservice, run the following command, or use the web console.
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216839077-fa173eac-29bf-409d-ae0c-559bee46652d.png)
+
+ 
+ Let’s change our microservice definition yaml to reflect that we want 3 pods instead of the one we see. Download the ostoy-microservice-deployment.yaml and save it on your local machine.
+
+Open the file using your favorite editor. Ex: vi ostoy-microservice-deployment.yaml.
+
+Find the line that states replicas: 1 and change that to replicas: 3. Then save and quit.
+
+It will look like this
+ 
+ > spec:
+    selector:
+      matchLabels:
+        app: ostoy-microservice
+    replicas: 3
+ 
+ Assuming you are still logged in via the CLI, execute the following command:
+ 
+ > oc apply -f ostoy-microservice-deployment.yaml
+ 
+ Confirm that there are now 3 pods via the CLI (oc get pods) or the web console (Workloads > Deployments > ostoy-microservice).
+
+See this visually by visiting the OSToy app and seeing how many boxes you now see. It should be three.
+ 
+  ![image](https://user-images.githubusercontent.com/32516987/216839095-293b6468-6b69-4c4f-b83e-bcce0d02b1dc.png)
+ 
+ Now we will scale the pods down using the command line. Execute the following command from the CLI:
+ 
+ > oc scale deployment ostoy-microservice --replicas=2
+
+Confirm that there are indeed 2 pods, via the CLI (oc get pods) or the web console.
+
+See this visually by visiting the OSToy App and seeing how many boxes you now see. It should be two.
+
+Lastly, let’s use the web console to scale back down to one pod. Make sure you are in the project you created for this app (i.e., “ostoy”), in the left menu click Workloads > Deployments > ostoy-microservice. On the left you will see a blue circle with the number 2 in the middle. Click on the down arrow to the right of that to scale the number of pods down to 1.
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216839113-69f85d33-74a7-4966-9919-6f3597b56d6e.png)
+
+
+
+ See this visually by visiting the OSToy app and seeing how many boxes you now see. It should be one. You can also confirm this via the CLI or the web console.
+ 
+ ### Pod AutoScaling
+ 
+ In this section we will explore how the Horizontal Pod Autoscaler (HPA) can be used and works within Kubernetes/OpenShift.
+ 
+ In more simple words, “if there is a lot of work, make more pods”.
+
+We will create a HPA and then use OSToy to generate CPU intensive workloads. We will then observe how the HPA will scale up the number of pods in order to handle the increased workloads.
+
+### 1. Create the Horizontal AutoScaler
+ 
+ Run the following command to create the HPA. This will create an HPA that maintains between 1 and 10 replicas of the pods controlled by the ostoy-microservice deployment created. Roughly speaking, the HPA will increase and decrease the number of replicas (via the deployment) to maintain an average CPU utilization across all pods of 80% (since each pod requests 50 millicores, this means average CPU usage of 40 millicores).
+ 
+ oc autoscale deployment/ostoy-microservice --cpu-percent=80 --min=1 --max=10
+ 
+ 
+### 2. View the current pod number
+ 
+ In the OSToy app in the left menu, click on “Autoscaling” to access this portion of the workshop.
+
+![image](https://user-images.githubusercontent.com/32516987/216839226-43f1a170-ba91-4a8a-853f-bcadd2c8b71e.png)
+
+ As was in the networking section you will see the total number of pods available for the microservice by counting the number of colored boxes. In this case we have only one. This can be verified through the web console or from the CLI.
+ 
+ ![image](https://user-images.githubusercontent.com/32516987/216839240-b75f22b8-401b-4ff0-b8d3-656e9282571a.png)
+
+ You can use the following command to see the running microservice pods only:
+
+ > oc get pods --field-selector=status.phase=Running | grep microservice
+ 
+ ### 3. Increase the Load
+
+Since we now only have one pod, let’s increase the workload that the pod needs to perform. Click the link in the center of the card that says “increase the load”. ** Please click only ONCE! **
+ 
+ ### 4. See the pods scale up
+ 
+ > oc get pods --field-selector=status.phase=Running
+
+### 5. Review Resources in included observability
+ 
+ In the OpenShift web console left menu, click on Observe > Dashboards
+
+In the dashboard, select Kubernetes / Compute Resources / Namespace (Pods) and our namespace ostoy.
+ 
+![image](https://user-images.githubusercontent.com/32516987/216839334-7de0293e-803f-4825-9170-59cf29cfc373.png)
+
+ 
