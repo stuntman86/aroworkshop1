@@ -451,6 +451,136 @@ You will see all of the application logs scroll on your screen:
 
 ![image](https://user-images.githubusercontent.com/32516987/216836941-73f73302-8c3f-4a1e-a1fc-6462e0a2acf6.png)
 
+# Nationalparks Java App
+
+In this section, we’re going to deploy a backend service, developed in Java that will expose 2 main REST endpoints to the visualizer application (parksmap web component that was deployed in the previous labs). The application will query for national parks information (including its coordinates) that is stored in a MongoDB database. This application will also provide an external access point, so that the API provided can be directly used by the end user.
+
+
+![image](https://user-images.githubusercontent.com/32516987/216927918-515ffd8a-b781-42de-91dc-eaf6fe221ecc.png)
+
+### Exercise: Creating a Java application
+
+
+The backend service that we will be deploying as part of this exercise is called nationalparks. This is a Java Spring Boot application that performs 2D geo-spatial queries against a MongoDB database to locate and return map coordinates of all National Parks in the world. That was just a fancy way of saying that we are going to deploy a webservice that returns a JSON list of places.
+
+### Add to Project
+
+Because the nationalparks component is a backend to serve data that our existing frontend (parksmap) will consume, we are going to build it inside the existing project that we have been working with. To illustrate how you can interact with OpenShift via the CLI or the web console, we will deploy the nationalparks component using the web console.
+
+### Using Application Code on Git Server
+OpenShift can work with any accessible Git repository. This could be GitHub, GitLab, or any other server that speaks Git. You can even register webhooks in your Git server to initiate OpenShift builds triggered by any update to the application code!
+
+[National Parks Github Repo](https://github.com/openshift-roadshow/nationalparks)
+
+Later in the lab, we want you to make a code change and then rebuild your application. This is a fairly simple Spring framework Java application.
+
+### Build the Code on OpenShift
+
+Similar to how we used +Add before with an existing image, we can do the same for specifying a source code repository. Since for this lab you have your own git repository, let’s use it with a simple Java S2I image.
+
+In the Developer Perspective, click +Add in the left navigation and then choose "From Git"
+
+![image](https://user-images.githubusercontent.com/32516987/216928369-e5274631-16be-4ffc-80b8-f5c468beae23.png)
+
+The Import from Git workflow will guide you through the process of deploying your app based on a few selections.
+
+Enter the following for Git Repo URL:
+
+> https://github.com/openshift-roadshow/nationalparks.git
+
+ARO will automatically guess the Git server type and the programming language used by the source code. Verify that Java has been selected as your Builder Image, and be sure to select version 11 to have OpenJDK 11.
+
+![image](https://user-images.githubusercontent.com/32516987/216928493-b6e112dd-42c2-481c-8340-a7edadc81985.png)
+
+Scroll down to the General section. Select:
+
+* Application Name : workshop
+
+* Name : nationalparks
+
+In Resources section, select Deployment Config.
+
+Expand the Labels section and add 3 labels.
+
+The name of the Application group:
+
+> app=workshop
+
+> component=nationalparks
+
+> role=backend
+
+![image](https://user-images.githubusercontent.com/32516987/216928658-1c7a623c-4924-4207-82d6-cdabb72c49a1.png)
+
+To see the build logs, in Topology view, click the nationalparks entry, then click on View Logs in the Builds section of the Resources tab.
+
+![image](https://user-images.githubusercontent.com/32516987/216928719-2b240df5-11cb-4dc8-93f1-b2db6c75e5e2.png)
+
+This is a Java-based application that uses Maven as the build and dependency system. For this reason, the initial build will take a few minutes as Maven downloads all of the dependencies needed for the application. You can see all of this happening in real time!
+
+From the command line, you can also see the Builds:
+
+> oc get builds
+
+You will get an output like this : 
+
+![image](https://user-images.githubusercontent.com/32516987/216928912-83ef8033-a6e1-4330-8941-3df0ddfefd51.png)
+
+
+You can also view the build logs with the following command:
+
+> oc logs -f builds/nationalparks-1
+
+After the build has completed and successfully:
+
+* The S2I process will push the resulting image to the internal OpenShift registry
+
+* The DeploymentConfiguration (DC) will detect that the image has changed, and this will cause a new deployment to happen.
+
+* A ReplicationController (RC) will be spawned for this new deployment.
+
+* The RC will detect no Pods are running and will cause one to be deployed, as our default replica count is just 1.
+
+In the end, when issuing the oc get pods command, you will see that the build Pod has finished (exited) and that an application Pod is in a ready and running state:
+
+![image](https://user-images.githubusercontent.com/32516987/216929093-5f515d4a-5f5a-4723-ad3b-4cdf82690e5f.png)
+
+If you look again at the web console, you will notice that, when you create the application this way, OpenShift also creates a Route for you. You can see the URL in the web console, or via the command line:
+
+> oc get routes
+
+Where you should see something like the following:
+
+![image](https://user-images.githubusercontent.com/32516987/216929222-177b1483-83b8-401f-8db0-ee68592315de.png)
+
+
+In the above example, the URL is:
+
+
+> http://nationalparks-workshop.%CLUSTER_SUBDOMAIN%
+
+
+Since this is a backend application, it doesn’t actually have a web interface. However, it can still be used with a browser. All backends that work with the parksmap frontend are required to implement a /ws/info/ endpoint. 
+
+
+You will see a simple JSON string:
+
+> {"id":"nationalparks","displayName":"National Parks","center":{"latitude":"47.039304","longitude":"14.505178"},"zoom":4}
+
+Earlier we said:
+
+> This is a Java Spring Boot application that performs 2D geo-spatial queries
+against a MongoDB database
+
+But there is no database... yet!
+
+
+
+
+
+
+
+
 
 #Lab 2 : ARO Internals (if you would like to continue experimenting on different stuff of your choice on ARO instead , please go ahead)
 
