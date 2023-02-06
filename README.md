@@ -596,20 +596,9 @@ The database image is built in a way that it will automatically configure itself
 
 * The user can access the specified database with the specified password
 
-In the Developer Perspective in your workshop project, click +Add and then Database. In the Databases view, you can click Mongo to filter for just MongoDB.
+In the Developer Perspective in your workshop project, click +Add and then from container image : 
 
-> Make sure to uncheck Operator Backed option from Type section
-
-
-![image](https://user-images.githubusercontent.com/32516987/216930085-fcf50eed-af7f-444c-acf5-1fa40faa9657.png)
-
-
-Alternatively, you could type mongodb in the search box. Once you have drilled down to see MongoDB, find the MongoDB (Ephemeral) template and select it. You will notice that there are multiple MongoDB templates available. We do not need a database with persistent storage, so the ephemeral Mongo template is what you should choose. Go ahead and select the ephemeral template and click the Instantiate Template button.
-
-When we performed the application build, there was no template. Rather, we selected the builder image directly and OpenShift presented only the standard build workflow. Now we are using a template - a preconfigured set of resources that includes parameters that can be customized. In our case, the parameters we are concerned with are — user, password, database, and admin password.
-
-![image](https://user-images.githubusercontent.com/32516987/216930218-5f2fa9e5-0dee-41a3-80f6-b4c553b12f9e.png)
-
+use this container image : bitnami/mongodb
 
 Make sure you name your database service name mongodb-nationalparks
 
