@@ -574,15 +574,169 @@ against a MongoDB database
 
 But there is no database... yet!
 
+## Connecting to a Database
+
+In this section we will deploy and connect a MongoDB database where the nationalparks application will store location information.
+
+Finally, we will mark the nationalparks application as a backend for the map visualization tool, so that it can be dynamically discovered by the parksmap component using the OpenShift discovery mechanism and the map will be displayed automatically.
+
+![image](https://user-images.githubusercontent.com/32516987/216929873-7903f77d-2bae-41d4-8475-60baadef414b.png)
+
+
+### Exercise : Deploy Mongo DB
+
+
+As you’ve seen so far, the web console makes it very easy to deploy things onto OpenShift. When we deploy the database, we pass in some values for configuration. These values are used to set the username, password, and name of the database.
+
+The database image is built in a way that it will automatically configure itself using the supplied information (assuming there is no data already present in the persistent storage!). The image will ensure that:
+
+* A database exists with the specified name
+
+* A user exists with the specified name
+
+* The user can access the specified database with the specified password
+
+In the Developer Perspective in your workshop project, click +Add and then Database. In the Databases view, you can click Mongo to filter for just MongoDB.
+
+> Make sure to uncheck Operator Backed option from Type section
+
+
+![image](https://user-images.githubusercontent.com/32516987/216930085-fcf50eed-af7f-444c-acf5-1fa40faa9657.png)
+
+
+Alternatively, you could type mongodb in the search box. Once you have drilled down to see MongoDB, find the MongoDB (Ephemeral) template and select it. You will notice that there are multiple MongoDB templates available. We do not need a database with persistent storage, so the ephemeral Mongo template is what you should choose. Go ahead and select the ephemeral template and click the Instantiate Template button.
+
+When we performed the application build, there was no template. Rather, we selected the builder image directly and OpenShift presented only the standard build workflow. Now we are using a template - a preconfigured set of resources that includes parameters that can be customized. In our case, the parameters we are concerned with are — user, password, database, and admin password.
+
+![image](https://user-images.githubusercontent.com/32516987/216930218-5f2fa9e5-0dee-41a3-80f6-b4c553b12f9e.png)
+
+
+Make sure you name your database service name mongodb-nationalparks
+
+
+You can see that some of the fields say "generated if empty". This is a feature of Templates in OpenShift. For now, be sure to use the following values in their respective fields:
+
+* Database Service Name : mongodb-nationalparks
+
+* MongoDB Connection Username : mongodb
+
+* MongoDB Connection Password : mongodb
+
+* MongoDB Database Name: mongodb
+
+* MongoDB Admin Password : mongodb
+
+Once you have entered in the above information, click on Create to go to the next step which will allow us to add a binding.
+
+From left-side menu, click to Secrets.
+
+![image](https://user-images.githubusercontent.com/32516987/216930475-768f63bb-4eab-477f-ae18-0ea842e72288.png)
+
+Click the secret name listed that we will use for Parameters. The secret can be used in other components, such as the nationalparks backend, to authenticate to the database.
+
+Now that the connection and authentication information stored in a secret in our project, we need to add it to the nationalparks backend. Click the Add Secret to Workload button.
+
+![image](https://user-images.githubusercontent.com/32516987/216930530-1a969241-75b3-48c6-835b-f175e87b2a12.png)
+
+This change in configuration will trigger a new deployment of the nationalparks application with the environment variables properly injected.
+
+Back in the Topology view, click and drag with Shift key the mongodb-nationalparks component into the light gray area that denotes the workshop application, so that all three components are contained in it.
+
+
+![image](https://user-images.githubusercontent.com/32516987/216930591-91d5af41-7940-415b-b265-ce0653d814da.png)
+
+
+Next, let’s fix the labels assigned to the mongodb-nationalparks deployment. Currently, we cannot set labels when using the database template from the catalog, so we will fix these labels manually.
+
+Like before, we’ll add 3 labels:
+
+The name of the Application group:
+
+> app=workshop
+
+> component=nationalparks
+
+> role=database
+
+> oc label dc/mongodb-nationalparks svc/mongodb-nationalparks app=workshop component=nationalparks role=database --overwrite
+
+## Exercise: Exploring ARO Magic
+
+As soon as we changed the DeploymentConfiguration, some magic happened. OpenShift decided that this was a significant enough change to warrant updating the internal version number of the DeploymentConfiguration. You can verify this by looking at the output of oc get dc:
+
+![image](https://user-images.githubusercontent.com/32516987/216930862-930829e9-93a0-42e2-a16f-2cf385a6b5b6.png)
+
+Something that increments the version of a DeploymentConfiguration, by default, causes a new deployment. You can verify this by looking at the output of oc get rc:
+
+
+![image](https://user-images.githubusercontent.com/32516987/216930929-cd842ef9-819e-41ee-ad9f-dbf952466bfa.png)
+
+We see that the desired and current number of instances for the "-1" deployment is 0. The desired and current number of instances for the "-2" deployment is 1. This means that OpenShift has gracefully torn down our "old" application and stood up a "new" instance.
+
+## Exercise: Data, Data, Everywhere
+
+Now that we have a database deployed, we can again visit the nationalparks web service to query for data:
+
+
+> http://nationalparks-workshop.%CLUSTER_SUBDOMAIN%/ws/data/all
+
+The result should be nothing at this stage... 
+
+Where’s the data? Think about the process you went through. You deployed the application and then deployed the database. Nothing actually loaded anything INTO the database, though.
+
+The application provides an endpoint to do just that:
+
+> http://nationalparks-workshop.%CLUSTER_SUBDOMAIN%/ws/data/load
+
+This will result to data inserted in the database.
+
+If you then go back to /ws/data/all you will see tons of JSON data now. That’s great. Our parks map should finally work!
+
+
+> http://parksmap-workshop.%CLUSTER_SUBDOMAIN%
+
+There’s just one thing. The main map STILL isn’t displaying the parks. That’s because the front end parks map only tries to talk to services that have the right Label.
+
+## Exercise: Working With Labels
+
+We explored how a Label is just a key=value pair earlier when looking at Services and Routes and Selectors. In general, a Label is simply an arbitrary key=value pair. It could be anything.
+
+* pizza=pepperoni
+
+* pet=dog
+
+* openshift=awesome
+
+In the case of the parks map, the application is actually querying the OpenShift API and asking about the Routes and Services in the project. If any of them have a Label that is type=parksmap-backend, the application knows to interrogate the endpoints to look for map data. You can see the code that does this here.
+
+Fortunately, the command line provides a convenient way for us to manipulate labels. describe the nationalparks service:
+
+> oc describe route nationalparks
+
+![image](https://user-images.githubusercontent.com/32516987/216931532-4768bcac-ba9d-40c1-bb85-f82f1ea66935.png)
+
+You see that it already has some labels. Now, use oc label:
+
+> oc label route nationalparks type=parksmap-backend
+
+You will get something like this : 
+
+> route.route.openshift.io/nationalparks labeled
+
+If you check your browser now:
+
+> http://parksmap-workshop.%CLUSTER_SUBDOMAIN%/
+
+![image](https://user-images.githubusercontent.com/32516987/216931679-f90a6f55-5bd2-4223-b5d4-0958fc8f7e21.png)
+
+
+You will see now that parks are start showing up !
 
 
 
 
 
-
-
-
-#Lab 2 : ARO Internals (if you would like to continue experimenting on different stuff of your choice on ARO instead , please go ahead)
+# Lab 2 : ARO Internals (if you would like to continue experimenting on different stuff of your choice on ARO instead , please go ahead)
 
 We will use an application named OStoy that will help us with this Lab.
 
