@@ -1,5 +1,5 @@
 
- # For every resource that you deploy on ARO (project/app etc) please append your student name number to it. For example if the documentation mentions to create a parksmap app , student 1 should create parksmap1 , student 2 parksmap2 etc                                        
+ # For every resource that you deploy on ARO (project/app etc) please append your student name number to it. For example if the documentation mentions to create a parksmap app , student 1 should create parksmap1 , student 2 parksmap2 etc.                                         
                                        
                                          
 # Lab 1 : Deploy a simple application on ARO                                           
